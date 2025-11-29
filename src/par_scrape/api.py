@@ -37,6 +37,7 @@ def _patch_selenium_chrome():
         import os
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
 
         original_init = webdriver.Chrome.__init__
 
@@ -45,6 +46,15 @@ def _patch_selenium_chrome():
             console_out.print("[magenta]DEBUG: Entering patched webdriver.Chrome.__init__[/magenta]")
             logger.debug(f"Chrome init args: {args}")
             logger.debug(f"Chrome init kwargs: {list(kwargs.keys())}")
+            
+            # Set up ChromeDriver service with explicit path
+            chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+            logger.info(f"Using ChromeDriver path: {chromedriver_path}")
+            
+            if 'service' not in kwargs:
+                kwargs['service'] = Service(executable_path=chromedriver_path)
+                logger.info(f"Created Service with executable_path: {chromedriver_path}")
+            
             # Ensure options are provided and add --no-sandbox for Docker
             if 'options' not in kwargs:
                 kwargs['options'] = Options()
