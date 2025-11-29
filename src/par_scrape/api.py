@@ -181,7 +181,6 @@ class ScrapeRequest(BaseModel):
         headless: Run browser in headless mode
         wait_type: Type of wait strategy (sleep, idle, none, selector, text)
         wait_selector: CSS selector or text to wait for (required for selector/text wait_type)
-        include_images: Include images in the markdown output
     """
 
     url: str = Field(..., description="URL to scrape")
@@ -195,7 +194,7 @@ class ScrapeRequest(BaseModel):
         default="sleep", description="Wait strategy to use"
     )
     wait_selector: str | None = Field(default=None, description="CSS selector or text to wait for")
-    include_images: bool = Field(default=True, description="Include images in markdown output")
+
 
 
 class ScrapeResponse(BaseModel):
@@ -203,13 +202,15 @@ class ScrapeResponse(BaseModel):
 
     Attributes:
         url: The URL that was scraped
-        markdown: The extracted content in markdown format
+        urls: List of all URLs found on the page (excluding images)
+        text: All visible text content from the page
         fetch_using: The scraper that was used
         processing_time: Time taken to process the request in seconds
     """
 
     url: str
-    markdown: str
+    urls: list[str]
+    text: str
     fetch_using: str
     processing_time: float
 
@@ -330,6 +331,60 @@ def map_wait_type(wait_type: str) -> ScraperWaitType:
     return mapping.get(wait_type, ScraperWaitType.SLEEP)
 
 
+def extract_urls_and_text(html: str, base_url: str) -> tuple[list[str], str]:
+    """Extract all URLs and visible text from HTML content.
+
+    Args:
+        html: HTML content to parse
+        base_url: Base URL for resolving relative links
+
+    Returns:
+        Tuple of (list of URLs, visible text)
+    """
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin, urlparse
+    
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Remove script and style elements
+    for script in soup(["script", "style"]):
+        script.decompose()
+    
+    # Extract all URLs from href attributes, excluding images
+    urls = []
+    for link in soup.find_all('a', href=True):
+        href = link['href']
+        # Skip empty hrefs, anchors, javascript, and mailto links
+        if not href or href.startswith('#') or href.startswith('javascript:') or href.startswith('mailto:'):
+            continue
+        
+        # Convert relative URLs to absolute
+        absolute_url = urljoin(base_url, href)
+        
+        # Parse the URL to validate it
+        parsed = urlparse(absolute_url)
+        if parsed.scheme in ['http', 'https']:
+            urls.append(absolute_url)
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_urls = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            unique_urls.append(url)
+    
+    # Extract visible text
+    text = soup.get_text(separator='\n', strip=True)
+    
+    # Clean up multiple newlines
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    clean_text = '\n'.join(lines)
+    
+    return unique_urls, clean_text
+
+
+
 # Endpoints
 @app.get("/", tags=["Info"])
 async def root() -> dict:
@@ -362,13 +417,13 @@ async def health() -> dict:
 
 @app.post("/scrape", response_model=ScrapeResponse, tags=["Scraping"])
 async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
-    """Scrape a URL and return the content as markdown.
+    """Scrape a URL and return all URLs and visible text from the page.
 
     Args:
         request: Scraping request parameters
 
     Returns:
-        ScrapeResponse with markdown content
+        ScrapeResponse with URLs list and visible text content
 
     Raises:
         InvalidURLError: If URL is invalid
@@ -426,20 +481,25 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
         if not html_list or not html_list[0]:
             raise ParsingError("No content was fetched from the URL")
 
-        # Convert HTML to markdown
-        logger.info("Converting HTML to markdown...")
-        markdown = html_to_markdown(html_list[0], url=request.url, include_images=request.include_images)
-        logger.info(f"Markdown conversion complete, length: {len(markdown) if markdown else 0} chars")
+        # Extract URLs and text from HTML
+        logger.info("Extracting URLs and text from HTML...")
+        urls, text = extract_urls_and_text(html_list[0], request.url)
+        logger.info(f"Extraction complete: {len(urls)} URLs found, text length: {len(text)} chars")
 
-        if not markdown or not markdown.strip():
-            logger.error("Markdown conversion resulted in empty content")
-            raise ParsingError("Markdown conversion resulted in empty content")
+        if not text or not text.strip():
+            logger.error("Text extraction resulted in empty content")
+            raise ParsingError("Text extraction resulted in empty content")
 
         processing_time = time.time() - start_time
         console_out.print(f"[green]Successfully scraped {request.url} in {processing_time:.2f}s[/green]")
+        console_out.print(f"[cyan]Found {len(urls)} URLs and {len(text)} characters of text[/cyan]")
 
         return ScrapeResponse(
-            url=request.url, markdown=markdown, fetch_using=request.fetch_using, processing_time=processing_time
+            url=request.url, 
+            urls=urls, 
+            text=text, 
+            fetch_using=request.fetch_using, 
+            processing_time=processing_time
         )
 
     except HTTPException:
