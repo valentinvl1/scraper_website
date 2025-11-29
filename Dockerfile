@@ -4,9 +4,11 @@ FROM python:3.13-slim
 # Set working directory
 WORKDIR /app
 
-# Install minimal system dependencies
+# Install system dependencies for Chromium/Selenium
 RUN apt-get update && apt-get install -y \
     curl \
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -21,10 +23,6 @@ COPY README.md CLAUDE.md LICENSE ./
 # Install dependencies with uv
 RUN uv sync --no-dev
 
-# Install Playwright and its system dependencies (automatically installs everything needed)
-RUN uv run playwright install chromium
-RUN uv run playwright install-deps chromium
-
 # Expose port
 EXPOSE 8000
 
@@ -32,6 +30,8 @@ EXPOSE 8000
 ENV HOST=0.0.0.0
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
 # Run the API
 CMD ["uv", "run", "par_scrape_api"]

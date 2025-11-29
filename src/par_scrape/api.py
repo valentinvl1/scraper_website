@@ -42,7 +42,7 @@ class ScrapeRequest(BaseModel):
 
     url: str = Field(..., description="URL to scrape")
     fetch_using: Literal["playwright", "selenium"] = Field(
-        default="playwright", description="Scraper to use (playwright or selenium)"
+        default="selenium", description="Scraper to use (playwright or selenium)"
     )
     sleep_time: int = Field(default=2, ge=0, le=30, description="Sleep time in seconds before scraping")
     timeout: int = Field(default=10, ge=1, le=60, description="Request timeout in seconds")
@@ -245,6 +245,7 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
 
     try:
         console_out.print(f"[cyan]Scraping URL:[/cyan] {request.url}")
+        console_out.print(f"[cyan]Using:[/cyan] {request.fetch_using}, headless={request.headless}, sleep={request.sleep_time}s")
 
         # Fetch HTML content
         html_list = fetch_url(
@@ -255,9 +256,13 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
             headless=request.headless,
             wait_type=map_wait_type(request.wait_type),
             wait_selector=request.wait_selector,
-            verbose=False,
+            verbose=True,
             console=console_out,
         )
+
+        console_out.print(f"[yellow]Fetched {len(html_list) if html_list else 0} items[/yellow]")
+        if html_list and html_list[0]:
+            console_out.print(f"[yellow]HTML length: {len(html_list[0])} chars[/yellow]")
 
         if not html_list or not html_list[0]:
             raise ParsingError("No content was fetched from the URL")
