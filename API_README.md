@@ -37,7 +37,8 @@ curl http://localhost:8000/health
 
 The Dockerfile:
 - Uses Python 3.13-slim
-- Installs Chromium and ChromeDriver for Selenium
+- Installs Playwright Chromium browser (recommended for Docker)
+- Installs Chromium and ChromeDriver for Selenium (as fallback)
 - Installs uv for dependency management
 - Exposes port 8000
 
@@ -90,7 +91,7 @@ Scrape a web page and return the content as markdown.
 ```json
 {
   "url": "https://example.com",
-  "fetch_using": "selenium",
+  "fetch_using": "playwright",
   "sleep_time": 2,
   "timeout": 10,
   "headless": true,
@@ -105,7 +106,7 @@ Scrape a web page and return the content as markdown.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `url` | string | Yes | - | URL to scrape (must start with http:// or https://) |
-| `fetch_using` | string | No | `"selenium"` | Scraper to use: `"playwright"` or `"selenium"` |
+| `fetch_using` | string | No | `"playwright"` | Scraper to use: `"playwright"` or `"selenium"` |
 | `sleep_time` | integer | No | `2` | Time to wait before scraping (0-30 seconds) |
 | `timeout` | integer | No | `10` | Request timeout (1-60 seconds) |
 | `headless` | boolean | No | `true` | Run browser in headless mode |
@@ -186,7 +187,7 @@ response = requests.post(
     "http://localhost:8000/scrape",
     json={
         "url": "https://www.maisoncerezy.fr/",
-        "fetch_using": "selenium",
+        "fetch_using": "playwright",
         "sleep_time": 2,
         "timeout": 10,
         "headless": True,
@@ -209,7 +210,7 @@ const response = await fetch('http://localhost:8000/scrape', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     url: 'https://www.maisoncerezy.fr/',
-    fetch_using: 'selenium',
+    fetch_using: 'playwright',
     sleep_time: 2,
     timeout: 10,
     headless: true
@@ -263,7 +264,8 @@ Railway automatically sets `PORT`. No additional configuration needed!
 
 The Dockerfile handles:
 - Installing Python 3.13
-- Installing Chromium and ChromeDriver for Selenium
+- Installing Playwright Chromium browser with all dependencies
+- Installing Chromium and ChromeDriver for Selenium (as fallback)
 - Installing uv and all dependencies
 - Starting the API server on $PORT
 
@@ -321,7 +323,7 @@ RELOAD=true  # Enable for development
 - **Timeout**: Increase for slow-loading pages (max 60s)
 - **Sleep Time**: Increase for JavaScript-heavy sites (max 30s)
 - **Headless Mode**: Keep `true` for production (faster, less resources)
-- **Playwright vs Selenium**: Selenium is the default and most reliable. Playwright may have issues in some deployment environments and requires browsers to be pre-installed
+- **Playwright vs Selenium**: Playwright is the default and recommended for Docker/Railway deployments. The Dockerfile automatically installs Chromium for Playwright. Selenium is also available as an alternative
 
 ## Troubleshooting
 
@@ -345,12 +347,16 @@ RELOAD=true  # Enable for development
 
 ### Playwright/Selenium Errors
 
-Make sure browsers are installed:
+**In Docker/Railway:**
+- Playwright is pre-installed in the Docker image (recommended)
+- Selenium is also available as fallback
+
+**For local development:**
 ```bash
 # Playwright
-uv run playwright install
+uv run playwright install chromium
 
-# Selenium (uses webdriver-manager, auto-installs)
+# Selenium (uses webdriver-manager, auto-installs ChromeDriver)
 ```
 
 ## Rate Limiting

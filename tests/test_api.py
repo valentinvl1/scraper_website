@@ -62,7 +62,7 @@ def test_scrape_request_defaults():
     from par_scrape.api import ScrapeRequest
 
     request = ScrapeRequest(url="https://example.com")
-    assert request.fetch_using == "selenium"
+    assert request.fetch_using == "playwright"
     assert request.sleep_time == 2
     assert request.timeout == 10
     assert request.headless is True
