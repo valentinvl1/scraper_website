@@ -21,6 +21,7 @@ from par_scrape import __application_title__, __version__
 def _patch_selenium_chrome():
     """Patch selenium.webdriver.Chrome to add --no-sandbox flag for Docker compatibility."""
     try:
+        import os
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
 
@@ -41,6 +42,12 @@ def _patch_selenium_chrome():
                     if flag not in existing_args:
                         options.add_argument(flag)
                         console_out.print(f"[yellow]Added Chrome flag for Docker: {flag}[/yellow]")
+
+                # Set binary location if CHROME_BIN is present
+                chrome_bin = os.environ.get("CHROME_BIN")
+                if chrome_bin:
+                    options.binary_location = chrome_bin
+                    console_out.print(f"[yellow]Set Chrome binary location to: {chrome_bin}[/yellow]")
 
             try:
                 return original_init(self, *args, **kwargs)

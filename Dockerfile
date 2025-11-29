@@ -8,7 +8,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     curl \
     chromium \
-    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -31,7 +30,6 @@ ENV HOST=0.0.0.0
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
 ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
 # Run the API
 CMD ["uv", "run", "par_scrape_api"]
