@@ -42,7 +42,7 @@ class ScrapeRequest(BaseModel):
 
     url: str = Field(..., description="URL to scrape")
     fetch_using: Literal["playwright", "selenium"] = Field(
-        default="playwright", description="Scraper to use (playwright or selenium)"
+        default="selenium", description="Scraper to use (playwright or selenium)"
     )
     sleep_time: int = Field(default=2, ge=0, le=30, description="Sleep time in seconds before scraping")
     timeout: int = Field(default=10, ge=1, le=60, description="Request timeout in seconds")

@@ -81,7 +81,7 @@ Scrape a web page and return the content as markdown.
 ```json
 {
   "url": "https://example.com",
-  "fetch_using": "playwright",
+  "fetch_using": "selenium",
   "sleep_time": 2,
   "timeout": 10,
   "headless": true,
@@ -96,7 +96,7 @@ Scrape a web page and return the content as markdown.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `url` | string | Yes | - | URL to scrape (must start with http:// or https://) |
-| `fetch_using` | string | No | `"playwright"` | Scraper to use: `"playwright"` or `"selenium"` |
+| `fetch_using` | string | No | `"selenium"` | Scraper to use: `"playwright"` or `"selenium"` |
 | `sleep_time` | integer | No | `2` | Time to wait before scraping (0-30 seconds) |
 | `timeout` | integer | No | `10` | Request timeout (1-60 seconds) |
 | `headless` | boolean | No | `true` | Run browser in headless mode |
@@ -177,7 +177,7 @@ response = requests.post(
     "http://localhost:8000/scrape",
     json={
         "url": "https://www.maisoncerezy.fr/",
-        "fetch_using": "playwright",
+        "fetch_using": "selenium",
         "sleep_time": 2,
         "timeout": 10,
         "headless": True,
@@ -200,7 +200,7 @@ const response = await fetch('http://localhost:8000/scrape', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     url: 'https://www.maisoncerezy.fr/',
-    fetch_using: 'playwright',
+    fetch_using: 'selenium',
     sleep_time: 2,
     timeout: 10,
     headless: true
@@ -309,7 +309,7 @@ RELOAD=true  # Enable for development
 - **Timeout**: Increase for slow-loading pages (max 60s)
 - **Sleep Time**: Increase for JavaScript-heavy sites (max 30s)
 - **Headless Mode**: Keep `true` for production (faster, less resources)
-- **Playwright vs Selenium**: Playwright is generally faster and more reliable
+- **Playwright vs Selenium**: Selenium is the default and most reliable. Playwright may have issues in some deployment environments and requires browsers to be pre-installed
 
 ## Troubleshooting
 

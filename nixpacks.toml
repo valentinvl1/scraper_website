@@ -1,0 +1,14 @@
+[variables]
+NIXPACKS_UV_VERSION = "0.9.13"
+
+[phases.setup]
+nixPkgs = ["python313"]
+
+[phases.install]
+cmds = [
+    "pip install uv==$NIXPACKS_UV_VERSION",
+    "uv sync --no-dev"
+]
+
+[start]
+cmd = "uv run par_scrape_api"

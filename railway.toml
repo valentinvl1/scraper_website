@@ -2,7 +2,6 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "uv run par_scrape_api"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
