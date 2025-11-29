@@ -11,6 +11,17 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+import logging
+import sys
+
+# Configure logging to stdout
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger("par_scrape_api")
+
 from par_ai_core.par_logging import console_out
 from par_ai_core.web_tools import ScraperWaitType, fetch_url, html_to_markdown
 from pydantic import BaseModel, Field
@@ -20,7 +31,9 @@ from par_scrape import __application_title__, __version__
 # Monkey-patch Selenium Chrome for Docker compatibility
 def _patch_selenium_chrome():
     """Patch selenium.webdriver.Chrome to add --no-sandbox flag for Docker compatibility."""
+    logger.info("Starting Selenium Chrome patch for Docker compatibility")
     try:
+        logger.debug("Importing selenium and webdriver modules")
         import os
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
@@ -28,7 +41,10 @@ def _patch_selenium_chrome():
         original_init = webdriver.Chrome.__init__
 
         def patched_init(self, *args, **kwargs):
+            logger.info("Chrome initialization called with patched init")
             console_out.print("[magenta]DEBUG: Entering patched webdriver.Chrome.__init__[/magenta]")
+            logger.debug(f"Chrome init args: {args}")
+            logger.debug(f"Chrome init kwargs: {list(kwargs.keys())}")
             # Ensure options are provided and add --no-sandbox for Docker
             if 'options' not in kwargs:
                 kwargs['options'] = Options()
@@ -46,37 +62,52 @@ def _patch_selenium_chrome():
 
                 # Set binary location if CHROME_BIN is present
                 chrome_bin = os.environ.get("CHROME_BIN")
+                logger.info(f"CHROME_BIN environment variable: {chrome_bin}")
                 console_out.print(f"[magenta]DEBUG: CHROME_BIN env var: {chrome_bin}[/magenta]")
                 if chrome_bin:
                     options.binary_location = chrome_bin
+                    logger.info(f"Set Chrome binary location to: {chrome_bin}")
                     console_out.print(f"[yellow]Set Chrome binary location to: {chrome_bin}[/yellow]")
                 else:
+                    logger.warning("CHROME_BIN not set, using default binary location")
                     console_out.print("[magenta]DEBUG: CHROME_BIN not set, using default binary location[/magenta]")
 
                 if hasattr(options, 'arguments'):
+                     logger.debug(f"Chrome arguments: {options.arguments}")
                      console_out.print(f"[magenta]DEBUG: Chrome arguments: {options.arguments}[/magenta]")
                 if hasattr(options, 'binary_location'):
+                     logger.debug(f"Chrome binary_location: {options.binary_location}")
                      console_out.print(f"[magenta]DEBUG: Chrome binary_location: {options.binary_location}[/magenta]")
 
             try:
-                return original_init(self, *args, **kwargs)
+                logger.info("Calling original Chrome.__init__")
+                result = original_init(self, *args, **kwargs)
+                logger.info("Chrome initialization successful")
+                return result
             except Exception as e:
+                logger.error(f"Chrome initialization failed: {str(e)}", exc_info=True)
                 console_out.print(f"[bold red]Chrome initialization failed: {str(e)}[/bold red]")
                 # Print the full command that was attempted
                 if hasattr(options, 'arguments'):
+                    logger.error(f"Failed Chrome arguments: {' '.join(options.arguments)}")
                     console_out.print(f"[bold red]Chrome arguments: {' '.join(options.arguments)}[/bold red]")
                 raise e
 
         webdriver.Chrome.__init__ = patched_init
+        logger.info("Selenium Chrome successfully patched for Docker compatibility")
         console_out.print("[green]Selenium Chrome patched for Docker compatibility[/green]")
 
     except ImportError:
+        logger.warning("Selenium not available, skipping Chrome patch")
         console_out.print("[yellow]Selenium not available, skipping Chrome patch[/yellow]")
     except Exception as e:
+        logger.error(f"Failed to patch Selenium Chrome: {str(e)}", exc_info=True)
         console_out.print(f"[bold red]Failed to patch Selenium Chrome: {str(e)}[/bold red]")
 
 # Apply the patch at module import time
+logger.info("Applying Selenium Chrome patch at module import")
 _patch_selenium_chrome()
+logger.info("Module initialization complete")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -84,6 +115,22 @@ app = FastAPI(
     description="Web scraping API with support for Playwright and Selenium",
     version=__version__,
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info(f"Incoming request: {request.method} {request.url}")
+    try:
+        body = await request.body()
+        logger.debug(f"Request body: {body.decode()}")
+    except Exception as e:
+        logger.error(f"Could not read request body: {e}")
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    logger.info(f"Request completed: {request.method} {request.url} - Status: {response.status_code} - Time: {process_time:.4f}s")
+    return response
 
 
 # Pydantic models
@@ -305,10 +352,14 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
         )
 
     try:
+        logger.info(f"Starting scrape for URL: {request.url}")
+        logger.info(f"Configuration: fetch_using={request.fetch_using}, headless={request.headless}, sleep={request.sleep_time}s")
+        logger.info(f"Wait configuration: wait_type={request.wait_type}, wait_selector={request.wait_selector}")
         console_out.print(f"[cyan]Scraping URL:[/cyan] {request.url}")
         console_out.print(f"[cyan]Using:[/cyan] {request.fetch_using}, headless={request.headless}, sleep={request.sleep_time}s")
 
         # Fetch HTML content
+        logger.info("Calling fetch_url...")
         html_list = fetch_url(
             request.url,
             fetch_using=request.fetch_using,
@@ -321,23 +372,31 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
             console=console_out,
         )
         
+        logger.info(f"fetch_url completed, returned type: {type(html_list)}")
         console_out.print(f"[magenta]DEBUG: fetch_url returned type: {type(html_list)}[/magenta]")
         if html_list:
+             logger.info(f"fetch_url returned list of length: {len(html_list)}")
              console_out.print(f"[magenta]DEBUG: fetch_url returned list of length: {len(html_list)}[/magenta]")
         else:
+             logger.warning("fetch_url returned empty list or None")
              console_out.print("[magenta]DEBUG: fetch_url returned empty list or None[/magenta]")
 
+        logger.debug(f"Fetch URL returned {len(html_list) if html_list else 0} items")
         console_out.print(f"[yellow]Fetched {len(html_list) if html_list else 0} items[/yellow]")
         if html_list and html_list[0]:
+            logger.debug(f"First HTML item length: {len(html_list[0])} chars")
             console_out.print(f"[yellow]HTML length: {len(html_list[0])} chars[/yellow]")
 
         if not html_list or not html_list[0]:
             raise ParsingError("No content was fetched from the URL")
 
         # Convert HTML to markdown
+        logger.info("Converting HTML to markdown...")
         markdown = html_to_markdown(html_list[0], url=request.url, include_images=request.include_images)
+        logger.info(f"Markdown conversion complete, length: {len(markdown) if markdown else 0} chars")
 
         if not markdown or not markdown.strip():
+            logger.error("Markdown conversion resulted in empty content")
             raise ParsingError("Markdown conversion resulted in empty content")
 
         processing_time = time.time() - start_time
@@ -353,16 +412,21 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
 
     except Exception as e:
         error_msg = str(e).lower()
+        logger.error(f"Exception caught in scrape endpoint: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
 
         # Classify error type
         if "timeout" in error_msg or "timed out" in error_msg:
+            logger.error("Classified as timeout error")
             raise ScrapingTimeoutError(request.timeout)
         elif "network" in error_msg or "connection" in error_msg:
+            logger.error("Classified as network error")
             raise NetworkError(str(e))
         elif "parse" in error_msg or "html" in error_msg:
             raise ParsingError(str(e))
         else:
             # Re-raise as generic HTTP exception
+            logger.error(f"Unexpected error during scraping: {str(e)}", exc_info=True)
             console_out.print(f"[bold red]Unexpected error:[/bold red] {str(e)}")
             import traceback
             console_out.print(f"[bold red]Traceback:[/bold red]\n{traceback.format_exc()}")
