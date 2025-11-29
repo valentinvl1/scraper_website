@@ -32,6 +32,7 @@ ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV WDM_LOCAL=1
 
 # Run the API
 CMD ["uv", "run", "par_scrape_api"]

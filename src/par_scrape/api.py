@@ -28,6 +28,32 @@ from pydantic import BaseModel, Field
 
 from par_scrape import __application_title__, __version__
 
+# Monkey-patch ChromeDriverManager to use system ChromeDriver
+def _patch_chromedriver_manager():
+    """Patch ChromeDriverManager to always return system ChromeDriver path."""
+    logger.info("Starting ChromeDriverManager patch")
+    try:
+        import os
+        from webdriver_manager.chrome import ChromeDriverManager
+        
+        original_install = ChromeDriverManager.install
+        
+        def patched_install(self):
+            chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+            logger.info(f"ChromeDriverManager.install() patched to return: {chromedriver_path}")
+            return chromedriver_path
+        
+        ChromeDriverManager.install = patched_install
+        logger.info("ChromeDriverManager successfully patched")
+    except ImportError:
+        logger.warning("webdriver-manager not available, skipping ChromeDriverManager patch")
+    except Exception as e:
+        logger.error(f"Failed to patch ChromeDriverManager: {str(e)}", exc_info=True)
+
+# Apply ChromeDriverManager patch first
+logger.info("Applying ChromeDriverManager patch at module import")
+_patch_chromedriver_manager()
+
 # Monkey-patch Selenium Chrome for Docker compatibility
 def _patch_selenium_chrome():
     """Patch selenium.webdriver.Chrome to add --no-sandbox flag for Docker compatibility."""
