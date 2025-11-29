@@ -22,7 +22,7 @@ RELOAD=true uv run par_scrape_api
 
 The API will be available at `http://localhost:8000`
 
-### Using Docker (Optional)
+### Using Docker
 
 ```bash
 # Build
@@ -30,7 +30,16 @@ docker build -t par-scrape-api .
 
 # Run
 docker run -p 8000:8000 par-scrape-api
+
+# Test
+curl http://localhost:8000/health
 ```
+
+The Dockerfile:
+- Uses Python 3.13-slim
+- Installs Chromium and ChromeDriver for Selenium
+- Installs uv for dependency management
+- Exposes port 8000
 
 ## API Endpoints
 
@@ -242,18 +251,21 @@ railway up
 ```
 
 Railway will automatically:
-- Detect the `railway.toml` configuration
-- Install dependencies with `uv`
+- Build the Docker image from `Dockerfile`
+- Use the `railway.toml` configuration
 - Run health checks on `/health`
 - Restart on failure (up to 3 times)
+- Set the PORT environment variable
 
 ### Environment Variables on Railway
 
 Railway automatically sets `PORT`. No additional configuration needed!
 
-Optional variables:
-- `HOST`: Bind address (default: `0.0.0.0`)
-- `RELOAD`: Enable auto-reload (default: `false`)
+The Dockerfile handles:
+- Installing Python 3.13
+- Installing Chromium and ChromeDriver for Selenium
+- Installing uv and all dependencies
+- Starting the API server on $PORT
 
 ### Other Platforms
 

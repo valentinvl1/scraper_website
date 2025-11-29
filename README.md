@@ -25,7 +25,31 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 - Token usage and cost estimation
 - Prompt cache for Anthropic provider
 - Uses my [PAR AI Core](https://github.com/paulrobello/par_ai_core)
+- **NEW:** REST API with FastAPI for web scraping (see [API Documentation](API_README.md))
 
+## REST API
+
+PAR Scrape now includes a REST API built with FastAPI!
+
+**Quick Start:**
+```bash
+# Run the API server
+uv run par_scrape_api
+
+# Test endpoint
+curl http://localhost:8000/health
+
+# Scrape a URL
+curl -X POST http://localhost:8000/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+```
+
+**Documentation:** See [API_README.md](API_README.md) for complete API documentation, including:
+- API endpoints and parameters
+- Deployment to Railway
+- Docker usage
+- Python/JavaScript client examples
 
 ## Known Issues
 - Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
