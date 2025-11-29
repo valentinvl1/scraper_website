@@ -11,11 +11,6 @@ RUN apt-get update && apt-get install -y \
     chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a wrapper for Chromium to force necessary flags for Docker
-RUN mv /usr/bin/chromium /usr/bin/chromium-original && \
-    echo '#!/bin/bash\n/usr/bin/chromium-original --no-sandbox --disable-dev-shm-usage --disable-gpu "$@"' > /usr/bin/chromium && \
-    chmod +x /usr/bin/chromium
-
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"

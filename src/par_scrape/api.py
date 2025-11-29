@@ -17,6 +17,51 @@ from pydantic import BaseModel, Field
 
 from par_scrape import __application_title__, __version__
 
+# Monkey-patch Selenium Chrome for Docker compatibility
+def _patch_selenium_chrome():
+    """Patch selenium.webdriver.Chrome to add --no-sandbox flag for Docker compatibility."""
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+
+        original_init = webdriver.Chrome.__init__
+
+        def patched_init(self, *args, **kwargs):
+            # Ensure options are provided and add --no-sandbox for Docker
+            if 'options' not in kwargs:
+                kwargs['options'] = Options()
+
+            options = kwargs['options']
+            if isinstance(options, Options):
+                # Add essential flags for Docker
+                existing_args = options.arguments if hasattr(options, 'arguments') else []
+                essential_flags = ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+
+                for flag in essential_flags:
+                    if flag not in existing_args:
+                        options.add_argument(flag)
+                        console_out.print(f"[yellow]Added Chrome flag for Docker: {flag}[/yellow]")
+
+            try:
+                return original_init(self, *args, **kwargs)
+            except Exception as e:
+                console_out.print(f"[bold red]Chrome initialization failed: {str(e)}[/bold red]")
+                # Print the full command that was attempted
+                if hasattr(options, 'arguments'):
+                    console_out.print(f"[bold red]Chrome arguments: {' '.join(options.arguments)}[/bold red]")
+                raise e
+
+        webdriver.Chrome.__init__ = patched_init
+        console_out.print("[green]Selenium Chrome patched for Docker compatibility[/green]")
+
+    except ImportError:
+        console_out.print("[yellow]Selenium not available, skipping Chrome patch[/yellow]")
+    except Exception as e:
+        console_out.print(f"[bold red]Failed to patch Selenium Chrome: {str(e)}[/bold red]")
+
+# Apply the patch at module import time
+_patch_selenium_chrome()
+
 # Initialize FastAPI app
 app = FastAPI(
     title="PAR Scrape API",
