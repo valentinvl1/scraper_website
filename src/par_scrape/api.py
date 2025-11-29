@@ -28,6 +28,7 @@ def _patch_selenium_chrome():
         original_init = webdriver.Chrome.__init__
 
         def patched_init(self, *args, **kwargs):
+            console_out.print("[magenta]DEBUG: Entering patched webdriver.Chrome.__init__[/magenta]")
             # Ensure options are provided and add --no-sandbox for Docker
             if 'options' not in kwargs:
                 kwargs['options'] = Options()
@@ -45,9 +46,17 @@ def _patch_selenium_chrome():
 
                 # Set binary location if CHROME_BIN is present
                 chrome_bin = os.environ.get("CHROME_BIN")
+                console_out.print(f"[magenta]DEBUG: CHROME_BIN env var: {chrome_bin}[/magenta]")
                 if chrome_bin:
                     options.binary_location = chrome_bin
                     console_out.print(f"[yellow]Set Chrome binary location to: {chrome_bin}[/yellow]")
+                else:
+                    console_out.print("[magenta]DEBUG: CHROME_BIN not set, using default binary location[/magenta]")
+
+                if hasattr(options, 'arguments'):
+                     console_out.print(f"[magenta]DEBUG: Chrome arguments: {options.arguments}[/magenta]")
+                if hasattr(options, 'binary_location'):
+                     console_out.print(f"[magenta]DEBUG: Chrome binary_location: {options.binary_location}[/magenta]")
 
             try:
                 return original_init(self, *args, **kwargs)
@@ -311,6 +320,12 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
             verbose=True,
             console=console_out,
         )
+        
+        console_out.print(f"[magenta]DEBUG: fetch_url returned type: {type(html_list)}[/magenta]")
+        if html_list:
+             console_out.print(f"[magenta]DEBUG: fetch_url returned list of length: {len(html_list)}[/magenta]")
+        else:
+             console_out.print("[magenta]DEBUG: fetch_url returned empty list or None[/magenta]")
 
         console_out.print(f"[yellow]Fetched {len(html_list) if html_list else 0} items[/yellow]")
         if html_list and html_list[0]:
@@ -349,4 +364,6 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
         else:
             # Re-raise as generic HTTP exception
             console_out.print(f"[bold red]Unexpected error:[/bold red] {str(e)}")
+            import traceback
+            console_out.print(f"[bold red]Traceback:[/bold red]\n{traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
