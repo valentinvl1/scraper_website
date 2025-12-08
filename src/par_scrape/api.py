@@ -4,6 +4,7 @@ This module provides a RESTful API for web scraping using Playwright or Selenium
 returning clean markdown content from web pages.
 """
 
+import asyncio
 import time
 from datetime import datetime
 from typing import Literal
@@ -247,8 +248,10 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
         console_out.print(f"[cyan]Scraping URL:[/cyan] {request.url}")
         console_out.print(f"[cyan]Using:[/cyan] {request.fetch_using}, headless={request.headless}, sleep={request.sleep_time}s")
 
-        # Fetch HTML content
-        html_list = fetch_url(
+        # Fetch HTML content in a separate thread to avoid event loop conflicts
+        # (Playwright creates its own event loop, which conflicts with FastAPI's)
+        html_list = await asyncio.to_thread(
+            fetch_url,
             request.url,
             fetch_using=request.fetch_using,
             sleep_time=request.sleep_time,
