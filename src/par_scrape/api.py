@@ -13,10 +13,11 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from par_ai_core.par_logging import console_out
-from par_ai_core.web_tools import ScraperWaitType, fetch_url, html_to_markdown
+from par_ai_core.web_tools import ScraperWaitType, fetch_url
 from pydantic import BaseModel, Field
 
 from par_scrape import __application_title__, __version__
+from par_scrape.utils import extract_urls_and_text
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -38,7 +39,6 @@ class ScrapeRequest(BaseModel):
         headless: Run browser in headless mode
         wait_type: Type of wait strategy (sleep, idle, none, selector, text)
         wait_selector: CSS selector or text to wait for (required for selector/text wait_type)
-        include_images: Include images in the markdown output
     """
 
     url: str = Field(..., description="URL to scrape")
@@ -52,7 +52,6 @@ class ScrapeRequest(BaseModel):
         default="sleep", description="Wait strategy to use"
     )
     wait_selector: str | None = Field(default=None, description="CSS selector or text to wait for")
-    include_images: bool = Field(default=True, description="Include images in markdown output")
 
 
 class ScrapeResponse(BaseModel):
@@ -60,13 +59,15 @@ class ScrapeResponse(BaseModel):
 
     Attributes:
         url: The URL that was scraped
-        markdown: The extracted content in markdown format
+        urls: List of all extracted href links from the page
+        text: Visible text content extracted from the page (plain text)
         fetch_using: The scraper that was used
         processing_time: Time taken to process the request in seconds
     """
 
     url: str
-    markdown: str
+    urls: list[str]
+    text: str
     fetch_using: str
     processing_time: float
 
@@ -201,7 +202,11 @@ async def root() -> dict:
         "description": "Web scraping API with support for Playwright and Selenium",
         "docs": "/docs",
         "endpoints": {
-            "scrape": {"method": "POST", "path": "/scrape", "description": "Scrape a URL and return markdown"},
+            "scrape": {
+                "method": "POST",
+                "path": "/scrape",
+                "description": "Scrape a URL and return extracted URLs and text",
+            },
             "health": {"method": "GET", "path": "/health", "description": "Health check endpoint"},
         },
     }
@@ -219,13 +224,13 @@ async def health() -> dict:
 
 @app.post("/scrape", response_model=ScrapeResponse, tags=["Scraping"])
 async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
-    """Scrape a URL and return the content as markdown.
+    """Scrape a URL and return extracted URLs and visible text.
 
     Args:
         request: Scraping request parameters
 
     Returns:
-        ScrapeResponse with markdown content
+        ScrapeResponse with extracted URLs and text content
 
     Raises:
         InvalidURLError: If URL is invalid
@@ -246,7 +251,9 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
 
     try:
         console_out.print(f"[cyan]Scraping URL:[/cyan] {request.url}")
-        console_out.print(f"[cyan]Using:[/cyan] {request.fetch_using}, headless={request.headless}, sleep={request.sleep_time}s")
+        console_out.print(
+            f"[cyan]Using:[/cyan] {request.fetch_using}, headless={request.headless}, sleep={request.sleep_time}s"
+        )
 
         # Fetch HTML content in a separate thread to avoid event loop conflicts
         # (Playwright creates its own event loop, which conflicts with FastAPI's)
@@ -270,17 +277,19 @@ async def scrape_url_endpoint(request: ScrapeRequest) -> ScrapeResponse:
         if not html_list or not html_list[0]:
             raise ParsingError("No content was fetched from the URL")
 
-        # Convert HTML to markdown
-        markdown = html_to_markdown(html_list[0], url=request.url, include_images=request.include_images)
+        # Extract URLs and visible text from HTML
+        urls, text = extract_urls_and_text(html_list[0], request.url)
 
-        if not markdown or not markdown.strip():
-            raise ParsingError("Markdown conversion resulted in empty content")
+        console_out.print(f"[yellow]Extracted {len(urls)} URLs and {len(text)} characters of text[/yellow]")
+
+        if not text or not text.strip():
+            raise ParsingError("Text extraction resulted in empty content")
 
         processing_time = time.time() - start_time
         console_out.print(f"[green]Successfully scraped {request.url} in {processing_time:.2f}s[/green]")
 
         return ScrapeResponse(
-            url=request.url, markdown=markdown, fetch_using=request.fetch_using, processing_time=processing_time
+            url=request.url, urls=urls, text=text, fetch_using=request.fetch_using, processing_time=processing_time
         )
 
     except HTTPException:

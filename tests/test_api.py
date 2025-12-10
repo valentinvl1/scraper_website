@@ -62,12 +62,11 @@ def test_scrape_request_defaults():
     from par_scrape.api import ScrapeRequest
 
     request = ScrapeRequest(url="https://example.com")
-    assert request.fetch_using == "selenium"
+    assert request.fetch_using == "playwright"
     assert request.sleep_time == 2
     assert request.timeout == 10
     assert request.headless is True
     assert request.wait_type == "sleep"
-    assert request.include_images is True
 
 
 def test_scrape_request_validation():
@@ -126,3 +125,42 @@ def test_openapi_schema():
     assert "/" in schema["paths"]
     assert "/health" in schema["paths"]
     assert "/scrape" in schema["paths"]
+
+
+def test_scrape_response_format():
+    """Test that scrape response has correct format with urls and text fields."""
+    from par_scrape.api import ScrapeResponse
+
+    # Test response model structure
+    response = ScrapeResponse(
+        url="https://example.com",
+        urls=["https://example.com/link1", "https://example.com/link2"],
+        text="This is visible text content",
+        fetch_using="playwright",
+        processing_time=1.5,
+    )
+
+    assert response.url == "https://example.com"
+    assert isinstance(response.urls, list)
+    assert len(response.urls) == 2
+    assert isinstance(response.text, str)
+    assert response.fetch_using == "playwright"
+    assert response.processing_time == 1.5
+
+
+def test_scrape_response_json_serialization():
+    """Test that response can be properly serialized to JSON."""
+    from par_scrape.api import ScrapeResponse
+
+    response = ScrapeResponse(
+        url="https://example.com",
+        urls=["https://link.com"],
+        text="Sample text",
+        fetch_using="playwright",
+        processing_time=1.0,
+    )
+
+    json_data = response.model_dump()
+    assert "urls" in json_data
+    assert "text" in json_data
+    assert "markdown" not in json_data  # Ensure old field is gone
